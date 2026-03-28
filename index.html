@@ -1,33 +1,524 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>NCT MF Tracker</title>
-  
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#130a1e">
-  <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/512/bullish.png">
-  
-  <style>
-    /* Removes all browser margins and locks the screen size */
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-      background-color: #130a1e;
-    }
-    /* Makes the Google Script take up exactly 100% of the screen */
-    iframe {
-      width: 100vw;
-      height: 100vh;
-      border: none;
-      display: block;
-    }
-  </style>
-</head>
-<body>
-  <iframe src="https://script.google.com/macros/s/AKfycbyobHqGfVoSY5Tx5msTLBL9ImGeCM_JC5XaQFCBolRhRVrzaRTl959HyW_vHxXPoABKIg/exec" allow="fullscreen"></iframe>
-</body>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>HT MF Tracker</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#130a1e">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/512/bullish.png">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "ce4c64c4-343d-4d42-b7c5-4bdc2c4653f1",
+          safari_web_id: "web.onesignal.auto.54cd441e-7f12-4aed-9845-f98eb5c10ecb",
+          notifyButton: {
+            enable: true, 
+          },
+          // 👇 EXPLICIT GITHUB PAGES FOLDER SCOPE 👇
+          serviceWorkerParam: { scope: "/nct-mf-tracker/" },
+          serviceWorkerPath: "nct-mf-tracker/OneSignalSDKWorker.js"
+        });
+      });
+    </script>
+
+    <style>
+      :root {
+        --bg-color: #130a1e; --card-bg: #221533; --primary: #9D4EDD; --text-main: #FFFFFF;
+        --text-muted: #AFA5D1; --success: #00E676; --danger: #FF4D4D; --border-color: rgba(255,255,255,0.03);
+        
+        --dash-bg-1: #2a1a40; --dash-bg-2: #1d112b; 
+        --dash-text: #FFFFFF; --dash-muted: rgba(255, 255, 255, 0.85); 
+        --dash-border: rgba(157, 78, 221, 0.2);
+        
+        --gold-bg-1: #4e3d0d; --gold-bg-2: #2b2208; --gold-border: rgba(255, 215, 0, 0.3);
+        --silver-bg-1: #3a3a3c; --silver-bg-2: #1c1c1e; --silver-border: rgba(192, 192, 192, 0.3);
+      }
+      body.light-theme {
+        --bg-color: #F7F7FC; --card-bg: #FFFFFF; --primary: #6C5DD3; --text-main: #242731;
+        --text-muted: #8F92A1; --success: #22C55E; --danger: #EF4444; --border-color: rgba(0,0,0,0.05);
+        
+        --dash-bg-1: #6C5DD3; --dash-bg-2: #5a4bbf; 
+        --dash-text: #FFFFFF; --dash-muted: rgba(255, 255, 255, 0.9); 
+        --dash-border: rgba(108, 93, 211, 0.2);
+        
+        --gold-bg-1: #FFD700; --gold-bg-2: #fcc200; --gold-border: rgba(184, 134, 11, 0.2);
+        --silver-bg-1: #E5E4E2; --silver-bg-2: #C0C0C0; --silver-border: rgba(128, 128, 128, 0.2);
+      }
+      body { 
+        margin: 0; padding: 0;
+        background-color: var(--bg-color); 
+        font-family: 'Poppins', sans-serif; 
+        color: var(--text-main); 
+        -webkit-font-smoothing: antialiased; 
+        transition: background-color 0.3s ease; 
+        overscroll-behavior-y: contain; 
+      }
+      
+      .nowrap { white-space: nowrap; }
+
+      #pull-to-refresh {
+        position: fixed; top: -60px; left: 0; width: 100%; height: 60px; display: flex;
+        align-items: center; justify-content: center; z-index: 1000; transition: transform 0.2s cubic-bezier(0, 0, 0.2, 1);
+      }
+      .refresh-icon {
+        width: 35px; height: 35px; background: var(--card-bg); border: 1px solid var(--border-color);
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2); color: var(--primary);
+      }
+
+      /* --- TOAST NOTIFICATION --- */
+      #toast-msg {
+        visibility: hidden;
+        min-width: 200px;
+        background-color: var(--card-bg);
+        color: var(--text-main);
+        text-align: center;
+        border-radius: 30px;
+        padding: 10px 20px;
+        position: fixed;
+        z-index: 2000;
+        left: 50%;
+        top: -50px; 
+        transform: translateX(-50%);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        border: 1px solid var(--border-color);
+        font-size: 0.85rem;
+        font-weight: 500;
+        opacity: 0;
+        transition: opacity 0.3s, top 0.3s;
+      }
+      #toast-msg.show {
+        visibility: visible;
+        opacity: 1;
+        top: 30px; 
+      }
+      .toast-success { border-left: 4px solid var(--success) !important; }
+      .toast-error { border-left: 4px solid var(--danger) !important; }
+
+      #page-dashboard {
+        flex-direction: column;
+        height: calc(100vh - 60px); 
+        height: calc(100dvh - 60px); 
+        gap: 12px; 
+        padding-bottom: 85px; 
+      }
+
+      .dashboard-card { 
+        background: linear-gradient(145deg, var(--dash-bg-1), var(--dash-bg-2)); 
+        border: 1px solid var(--dash-border); 
+        border-radius: 16px; 
+        padding: 16px 18px; 
+        color: var(--dash-text); 
+        box-shadow: 0 6px 15px rgba(0,0,0,0.1); 
+        flex: 1 1 0; 
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        margin-bottom: 0; 
+      }
+      
+      .gold-card { background: linear-gradient(145deg, var(--gold-bg-1), var(--gold-bg-2)) !important; border-color: var(--gold-border) !important; --dash-text: #FFF3E0; --dash-muted: rgba(255, 243, 224, 0.85); }
+      body.light-theme .gold-card { --dash-text: #3E2723; --dash-muted: rgba(62, 39, 35, 0.8); }
+
+      .silver-card { background: linear-gradient(145deg, var(--silver-bg-1), var(--silver-bg-2)) !important; border-color: var(--silver-border) !important; --dash-text: #FFFFFF; --dash-muted: rgba(255, 255, 255, 0.85); }
+      body.light-theme .silver-card { --dash-text: #212121; --dash-muted: rgba(33, 33, 33, 0.8); }
+
+      .fund-card { background: var(--card-bg); border-radius: 16px; padding: clamp(12px, 4vw, 16px); margin-bottom: 12px; border: 1px solid var(--border-color); }
+      .profit { color: var(--success) !important; font-weight: 600; }
+      .loss { color: var(--danger) !important; font-weight: 600; }
+      
+      .value-medium { font-size: clamp(1rem, 4.5vw, 1.25rem); font-weight: 600; line-height: 1.2; color: var(--dash-text); }
+      .text-small { font-size: clamp(0.7rem, 3vw, 0.75rem); color: var(--text-muted); }
+      .dash-text-small { font-size: clamp(0.7rem, 3.5vw, 0.8rem); color: var(--dash-muted); font-weight: 500; }
+      
+      .nav-arrow { font-size: 1.2rem; cursor: pointer; color: var(--dash-text); line-height: 1;}
+      
+      .theme-btn { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.9rem;}
+      
+      .action-btn {
+        background-color: var(--primary); 
+        color: #FFFFFF;
+        border: none;
+        border-radius: 50%; 
+        width: 56px; 
+        height: 56px;
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        position: fixed;
+        bottom: 25px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1050;
+      }
+      .action-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+      .action-btn:not(:disabled):active { transform: translateX(-50%) scale(0.92); } 
+
+      .sort-select {
+        background-color: var(--card-bg); color: var(--text-main); border: 1px solid var(--border-color);
+        border-radius: 8px; padding: 6px 10px; font-size: clamp(0.7rem, 2.5vw, 0.8rem);
+        font-family: 'Poppins', sans-serif; outline: none; box-shadow: 0 2px 4px rgba(0,0,0,0.05); cursor: pointer; max-width: 55%; 
+      }
+      .sort-select:focus { border-color: var(--primary); }
+
+      .floating-back-btn, .floating-top-btn {
+        position: fixed; right: 5vw; background: var(--primary); color: #FFFFFF; width: 50px; height: 50px;
+        border-radius: 50%; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3); display: none; align-items: center;
+        justify-content: center; cursor: pointer; z-index: 1050; transition: transform 0.2s ease, box-shadow 0.2s ease, bottom 0.3s ease;
+      }
+      .floating-back-btn { bottom: 25px; } .floating-top-btn { bottom: 25px; }
+      .floating-back-btn:active, .floating-top-btn:active { transform: scale(0.95); }
+    </style>
+  </head>
+  <body>
+    <div id="toast-msg"></div>
+
+    <div id="pull-to-refresh">
+      <div class="refresh-icon">
+        <div class="spinner-border spinner-border-sm" role="status"></div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center pt-2 pb-1 px-3">
+      <div onclick="toggleTheme()" class="theme-btn" id="theme-btn">
+        <span id="theme-icon">🌙</span>
+      </div>
+      <div onclick="toggleNumbers()" class="theme-btn" id="hide-btn">
+        <span id="hide-icon">🔒</span>
+      </div>
+    </div>
+
+    <button onclick="triggerNavFetch()" class="action-btn" id="nav-btn">
+      <svg id="refresh-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <polyline points="1 20 1 14 7 14"></polyline>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+      </svg>
+    </button>
+
+    <div id="floating-back-btn" class="floating-back-btn" onclick="switchPage('dashboard')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+    </div>
+
+    <div id="floating-top-btn" class="floating-top-btn" onclick="scrollToTop()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="19" x2="12" y2="5"></line>
+        <polyline points="5 12 12 5 19 12"></polyline>
+      </svg>
+    </div>
+
+    <div id="main-content" class="container pb-1" style="padding-left: 5vw; padding-right: 5vw; transition: transform 0.2s cubic-bezier(0, 0, 0.2, 1);">
+      
+      <div id="loading-state" class="text-center mt-5">
+        <div class="spinner-border text-primary"></div>
+        <div class="mt-2 text-small">Syncing...</div>
+      </div>
+      
+      <div id="page-dashboard" style="display: none;"></div>
+      
+      <div id="page-holdings" style="display: none;">
+        <div class="d-flex justify-content-between align-items-center mb-3 mt-1">
+          <div class="d-flex align-items-center cursor-pointer" onclick="switchPage('dashboard')">
+            <span class="nav-arrow me-2" style="color: var(--text-main)">&lsaquo;</span>
+            <h4 class="mb-0 fw-bold" id="holdings-title" style="font-size: clamp(1.2rem, 5vw, 1.5rem); color: var(--text-main);">Holdings</h4>
+          </div>
+          <select id="sortDropdown" class="sort-select" onchange="applySort(this.value)">
+            <option value="default">Default Order</option>
+            <option value="value_desc">Value (High to Low)</option>
+            <option value="value_asc">Value (Low to High)</option>
+            <option value="pl_desc">Overall P&L (High to Low)</option>
+            <option value="pl_asc">Overall P&L (Low to High)</option>
+            <option value="daily_desc">Day's Gain (High to Low)</option>
+            <option value="daily_asc">Day's Gain (Low to High)</option>
+          </select>
+        </div>
+        <div id="portfolio-list" style="padding-bottom: 120px;"></div>
+      </div>
+    </div>
+
+    <script>
+      // =================================================================
+      // YOUR GOOGLE APPS SCRIPT API
+      // =================================================================
+      const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyobHqGfVoSY5Tx5msTLBL9ImGeCM_JC5XaQFCBolRhRVrzaRTl959HyW_vHxXPoABKIg/exec"; 
+      
+      let rawData = null;
+      let activeView = 'all'; 
+      let isNumbersHidden = true; 
+      let currentSort = 'default'; 
+
+      const currencyFormatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 });
+
+      function showToast(message, isError = false) {
+        const toast = document.getElementById("toast-msg");
+        toast.innerHTML = message;
+        toast.className = isError ? "show toast-error" : "show toast-success";
+        setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+      }
+
+      async function triggerNavFetch() {
+        try {
+          const btn = document.getElementById('nav-btn');
+          const originalHtml = btn.innerHTML;
+
+          btn.disabled = true;
+          btn.innerHTML = '<div class="spinner-border text-white" style="width: 1.3rem; height: 1.3rem;" role="status"></div>';
+
+          const response = await fetch(GAS_WEB_APP_URL + "?action=refreshNav");
+          if (!response.ok) throw new Error("Network error fetching data");
+          
+          const result = await response.json();
+
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+          
+          if (result && result.success) {
+            showToast("✅ NAVs Updated!", false); 
+            loadData(); 
+          } else {
+            showToast("❌ Update Failed: " + (result.message || "Unknown error"), true); 
+          }
+            
+        } catch (err) {
+          const btn = document.getElementById('nav-btn');
+          btn.disabled = false;
+          btn.innerHTML = `<svg id="refresh-svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>`;
+          showToast("⚠️ Connection Error: " + err.message, true);
+        }
+      }
+
+      function toggleNumbers() {
+        isNumbersHidden = !isNumbersHidden;
+        document.getElementById('hide-icon').innerText = isNumbersHidden ? '🔒' : '👁️';
+        if (rawData) {
+          renderDashboard();
+          if (document.getElementById('page-holdings').style.display === 'block') { renderHoldings(activeView); }
+        }
+      }
+
+      function initTheme() {
+        const hour = new Date().getHours();
+        const isDayTime = hour >= 6 && hour < 18; 
+        const userForcedTheme = localStorage.getItem('user-manual-theme');
+        if (userForcedTheme === 'light' || (!userForcedTheme && isDayTime)) { applyLightTheme(); } else { applyDarkTheme(); }
+      }
+      function applyLightTheme() { document.body.classList.add('light-theme'); document.getElementById('theme-icon').innerText = '☀️'; }
+      function applyDarkTheme() { document.body.classList.remove('light-theme'); document.getElementById('theme-icon').innerText = '🌙'; }
+      function toggleTheme() {
+        if (document.body.classList.contains('light-theme')) { applyDarkTheme(); localStorage.setItem('user-manual-theme', 'dark'); } 
+        else { applyLightTheme(); localStorage.setItem('user-manual-theme', 'light'); }
+      }
+
+      function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+      function switchPage(page, type = 'all') {
+        activeView = type;
+        document.getElementById('page-dashboard').style.display = (page === 'dashboard' ? 'flex' : 'none');
+        document.getElementById('page-holdings').style.display = (page === 'holdings' ? 'block' : 'none');
+        
+        document.getElementById('nav-btn').style.display = (page === 'dashboard' ? 'flex' : 'none');
+
+        const backBtn = document.getElementById('floating-back-btn');
+        const topBtn = document.getElementById('floating-top-btn');
+        
+        if (page === 'holdings') {
+          backBtn.style.display = 'flex'; topBtn.style.bottom = '85px'; renderHoldings(type);
+        } else {
+          backBtn.style.display = 'none'; topBtn.style.bottom = '25px'; 
+        }
+        window.scrollTo(0, 0); 
+      }
+
+      function applySort(sortValue) { currentSort = sortValue; renderHoldings(activeView); }
+
+      async function loadData() {
+        try {
+          document.getElementById('loading-state').style.display = 'block';
+          document.getElementById('loading-state').innerHTML = '<div class="spinner-border text-primary"></div><div class="mt-2 text-small">Syncing...</div>';
+
+          const response = await fetch(GAS_WEB_APP_URL + "?action=getPortfolio", { redirect: "follow" });
+          if (!response.ok) throw new Error("Network error fetching data");
+          
+          const data = await response.json();
+
+          if (data && data.error) {
+            document.getElementById('loading-state').innerHTML = `
+              <div class="text-warning mt-3" style="background: rgba(255,165,0,0.1); padding: 15px; border-radius: 12px;">
+                <span style="font-size: 2rem;">📊</span><br><b style="font-size: 1.1rem;">Sheet Data Error</b><br>
+                <span style="font-size: 0.8rem; opacity: 0.8;">${data.error}</span><br><br>
+                <button class="btn btn-sm btn-outline-warning mt-2" onclick="loadData()">Try Again</button>
+              </div>`;
+            return;
+          }
+          
+          rawData = data;
+          document.getElementById('loading-state').style.display = 'none';
+          renderDashboard();
+          if (document.getElementById('page-holdings').style.display === 'block') { renderHoldings(activeView); } 
+          else { switchPage('dashboard'); }
+          resetRefreshUI(); 
+            
+        } catch (err) {
+          document.getElementById('loading-state').innerHTML = `
+            <div class="text-danger mt-3" style="background: rgba(255,0,0,0.1); padding: 15px; border-radius: 12px;">
+              <span style="font-size: 2rem;">🛑</span><br><b style="font-size: 1.1rem;">Connection Error</b><br>
+              <span style="font-size: 0.8rem; opacity: 0.8;">${err.message}</span><br><br>
+              <button class="btn btn-sm btn-outline-danger mt-2" onclick="loadData()">Try Again</button>
+            </div>`;
+        }
+      }
+
+      let touchStart = 0; let touchMove = 0;
+      const refreshEl = document.getElementById('pull-to-refresh');
+      const contentEl = document.getElementById('main-content');
+
+      document.addEventListener('touchstart', (e) => { if (window.scrollY === 0) touchStart = e.touches[0].pageY; }, { passive: true });
+      document.addEventListener('touchmove', (e) => {
+        const touch = e.touches[0].pageY;
+        if (window.scrollY === 0 && touch > touchStart) {
+          touchMove = touch - touchStart;
+          if (touchMove > 10 && touchMove < 150) {
+            const translateVal = touchMove / 2; refreshEl.style.transform = `translateY(${translateVal}px)`; contentEl.style.transform = `translateY(${translateVal}px)`;
+          }
+        }
+      }, { passive: true });
+      document.addEventListener('touchend', () => {
+        if (touchMove > 70) { refreshEl.style.transform = 'translateY(80px)'; contentEl.style.transform = 'translateY(80px)'; loadData(); } 
+        else { resetRefreshUI(); }
+        touchStart = 0; touchMove = 0;
+      });
+
+      function resetRefreshUI() { refreshEl.style.transform = 'translateY(0)'; contentEl.style.transform = 'translateY(0)'; }
+
+      window.addEventListener('scroll', () => {
+        const topBtn = document.getElementById('floating-top-btn');
+        if (window.scrollY > 200) { topBtn.style.display = 'flex'; } else { topBtn.style.display = 'none'; }
+      }, { passive: true });
+
+      document.addEventListener('DOMContentLoaded', () => { initTheme(); loadData(); });
+
+      function renderDashboard() {
+        const dash = document.getElementById('page-dashboard');
+        
+        const firstName = rawData.firstName || 'Investor';
+        const greetingHtml = `
+          <div class="mb-1 mt-1">
+            <h3 class="mb-0 fw-bold" style="font-size: 1.5rem; color: var(--text-main);">Hello, ${firstName} 👋</h3>
+          </div>
+        `;
+        
+        const createCard = (title, data, type, colorClass = '') => {
+          if (!data) return '';
+          
+          const net = data.latestValue || 0;
+          const inv = data.costValue || 0;
+          const pl = data.plValue !== undefined ? data.plValue : (data.profitLoss || 0);
+          const day = data.dailyValue !== undefined ? data.dailyValue : (data.dailyChange || 0);
+          const dayPct = data.dailyPct !== undefined ? data.dailyPct : (data.dailyChangePct || 0);
+          
+          const plClass = pl < 0 ? 'loss' : (pl > 0 ? 'profit' : '');
+          const dailyClass = day < 0 ? 'loss' : (day > 0 ? 'profit' : '');
+          
+          const lastUpdatedStr = rawData.lastUpdated || 'N/A';
+
+          const netStr = isNumbersHidden ? '₹ ••••••' : currencyFormatter.format(net);
+          const invStr = isNumbersHidden ? '₹ ••••••' : currencyFormatter.format(inv);
+          const plStr = isNumbersHidden ? '••••••' : `${pl > 0 ? '+' : ''}${currencyFormatter.format(pl)}`;
+          const dayStr = isNumbersHidden ? '••••••' : `${day > 0 ? '+' : ''}${currencyFormatter.format(day)}`;
+          const dayPctStr = isNumbersHidden ? '(••.••%)' : `(${dayPct > 0 ? '+' : ''}${dayPct.toFixed(2)}%)`;
+
+          return `
+            <div class="dashboard-card ${colorClass}">
+              <div class="d-flex justify-content-between align-items-center" onclick="switchPage('holdings', '${type}')">
+                <h2 class="mb-0 fw-bold" style="font-size: clamp(1.2rem, 5vw, 1.5rem); color: var(--dash-text);">${title}</h2><span class="nav-arrow">&rsaquo;</span>
+              </div>
+              
+              <div class="d-flex justify-content-between flex-wrap gap-1">
+                <div><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Networth</span><div class="value-medium">${netStr}</div></div>
+                <div class="text-end"><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Invested</span><div class="value-medium">${invStr}</div></div>
+              </div>
+              
+              <div class="d-flex justify-content-between flex-wrap gap-1 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                <div><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Overall P&L</span><span class="${plClass} nowrap" style="font-size: clamp(0.9rem, 3.5vw, 1rem);">${plStr}</span></div>
+                <div class="text-end"><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Day's Gain</span><span class="${dailyClass} nowrap" style="font-size: clamp(0.9rem, 3.5vw, 1rem);">${dayStr} <span style="font-size:0.85em;">${dayPctStr}</span></span></div>
+              </div>
+              
+              <div class="text-center">
+                <span class="dash-text-small" style="font-size: 0.65rem; opacity: 0.8;">${lastUpdatedStr}</span>
+              </div>
+            </div>`;
+        };
+
+        dash.innerHTML = greetingHtml + 
+                         createCard('Portfolio', rawData.totals, 'all') + 
+                         createCard('Gold', rawData.gold, 'gold', 'gold-card') + 
+                         createCard('Silver', rawData.silver, 'silver', 'silver-card');
+      }
+
+      function renderHoldings(type) {
+        let funds = [];
+        const sortDropdown = document.getElementById('sortDropdown');
+
+        if (type === 'all') {
+          funds = [...rawData.funds]; sortDropdown.style.display = 'block'; 
+          if (currentSort === 'value_desc') funds.sort((a, b) => b.latestValue - a.latestValue);
+          else if (currentSort === 'value_asc') funds.sort((a, b) => a.latestValue - b.latestValue);
+          else if (currentSort === 'pl_desc') funds.sort((a, b) => b.plValue - a.plValue);
+          else if (currentSort === 'pl_asc') funds.sort((a, b) => a.plValue - b.plValue);
+          else if (currentSort === 'daily_desc') funds.sort((a, b) => b.dailyValue - a.dailyValue);
+          else if (currentSort === 'daily_asc') funds.sort((a, b) => a.dailyValue - b.dailyValue);
+        } else {
+          sortDropdown.style.display = 'none'; 
+          if (type === 'gold') funds = [rawData.gold]; else if (type === 'silver') funds = [rawData.silver];
+        }
+
+        document.getElementById('holdings-title').innerText = type === 'all' ? 'Holdings' : (type === 'gold' ? 'Gold Detail' : 'Silver Detail');
+        
+        document.getElementById('portfolio-list').innerHTML = funds.map(f => {
+          const latestStr = isNumbersHidden ? '₹ ••••••' : currencyFormatter.format(f.latestValue);
+          const costStr = isNumbersHidden ? '₹ ••••••' : currencyFormatter.format(f.costValue);
+          const plStr = isNumbersHidden ? '••••••' : `${f.plValue > 0 ? '+' : ''}${currencyFormatter.format(f.plValue)}`;
+          const plPctStr = isNumbersHidden ? '(••.••%)' : `(${f.plPct > 0 ? '+' : ''}${f.plPct.toFixed(2)}%)`;
+          const dayStr = isNumbersHidden ? '••••••' : `${f.dailyValue > 0 ? '+' : ''}${currencyFormatter.format(f.dailyValue)}`;
+          const dayPctStr = isNumbersHidden ? '(••.••%)' : `(${f.dailyPct > 0 ? '+' : ''}${f.dailyPct.toFixed(2)}%)`;
+          
+          const plClass = f.plValue < 0 ? 'loss' : (f.plValue > 0 ? 'profit' : '');
+          const dailyClass = f.dailyValue < 0 ? 'loss' : (f.dailyValue > 0 ? 'profit' : '');
+
+          return `
+            <div class="fund-card">
+              <div class="d-flex align-items-start mb-2 gap-2">
+                <div class="flex-grow-1" style="min-width: 0;">
+                  <strong class="d-block mb-1" style="font-size: clamp(0.85rem, 3.5vw, 0.95rem); line-height: 1.3; word-wrap: break-word; color: var(--text-main);">${f.name}</strong>
+                  <span class="text-small">NAV: ₹${f.nav} <span style="opacity:0.7">(${f.navDate})</span></span>
+                </div>
+                <div class="text-end flex-shrink-0">
+                  <strong class="d-block mb-1" style="font-size: clamp(0.95rem, 4vw, 1.05rem); color: var(--text-main);">${latestStr}</strong>
+                  <span class="text-small">Inv: ${costStr}</span>
+                </div>
+              </div>
+              <div class="d-flex justify-content-between flex-wrap gap-2 pt-2 border-top border-secondary">
+                <div class="text-small">P&L: <span class="${plClass} nowrap">${plStr} <span style="font-size:0.85em;">${plPctStr}</span></span></div>
+                <div class="text-small">Day: <span class="${dailyClass} nowrap">${dayStr} <span style="font-size:0.85em;">${dayPctStr}</span></span></div>
+              </div>
+            </div>`;
+        }).join('');
+      }
+    </script>
+  </body>
 </html>
