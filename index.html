@@ -435,6 +435,8 @@
           const dailyClass = day < 0 ? 'loss' : (day > 0 ? 'profit' : '');
           
           const lastUpdatedStr = rawData.lastUpdated || 'N/A';
+          // 👇 NEW: Extract CAS Timestamp from the backend payload
+          const casUpdatedStr = rawData.casUpdated || 'Pending'; 
 
           const netStr = isNumbersHidden ? '₹ ••••••' : currencyFormatter.format(net);
           const invStr = isNumbersHidden ? '₹ ••••••' : currencyFormatter.format(inv);
@@ -460,6 +462,7 @@
               
               <div class="text-center">
                 <span class="dash-text-small" style="font-size: 0.65rem; opacity: 0.8;">${lastUpdatedStr}</span>
+                <span class="dash-text-small" style="font-size: 0.55rem; opacity: 0.5; line-height: 1;">${casUpdatedStr}</span>
               </div>
             </div>`;
         };
