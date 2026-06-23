@@ -413,7 +413,7 @@
 
       document.addEventListener('DOMContentLoaded', () => { initTheme(); loadData(); });
 
-      function renderDashboard() {
+     function renderDashboard() {
         const dash = document.getElementById('page-dashboard');
         
         const firstName = rawData.firstName || 'Investor';
@@ -432,33 +432,38 @@
           const day = data.dailyValue !== undefined ? data.dailyValue : (data.dailyChange || 0);
           const dayPct = data.dailyPct !== undefined ? data.dailyPct : (data.dailyChangePct || 0);
           
+          // 👇 NEW: Calculate Overall P&L Percentage
+          const plPct = inv > 0 ? (pl / inv) * 100 : 0;
+          
           const plClass = pl < 0 ? 'loss' : (pl > 0 ? 'profit' : '');
           const dailyClass = day < 0 ? 'loss' : (day > 0 ? 'profit' : '');
           
           const lastUpdatedStr = rawData.lastUpdated || 'N/A';
-          // 👇 NEW: Extract CAS Timestamp from the backend payload
           const casUpdatedStr = rawData.casUpdated || 'Pending'; 
 
           const netStr = isNumbersHidden ? '₹ ••••••' : currencyFormatter.format(net);
           const invStr = isNumbersHidden ? '₹ ••••••' : currencyFormatter.format(inv);
           const plStr = isNumbersHidden ? '••••••' : `${pl > 0 ? '+' : ''}${currencyFormatter.format(pl)}`;
+          // 👇 NEW: Format the P&L percentage string
+          const plPctStr = isNumbersHidden ? '(••.••%)' : `(${plPct > 0 ? '+' : ''}${plPct.toFixed(2)}%)`;
           const dayStr = isNumbersHidden ? '••••••' : `${day > 0 ? '+' : ''}${currencyFormatter.format(day)}`;
           const dayPctStr = isNumbersHidden ? '(••.••%)' : `(${dayPct > 0 ? '+' : ''}${dayPct.toFixed(2)}%)`;
 
+          // 👇 NEW: Changed flex-wrap to flex-nowrap, added min-width: 0, and applied text-nowrap to keep it all on one line
           return `
             <div class="dashboard-card ${colorClass}">
               <div class="d-flex justify-content-between align-items-center" onclick="switchPage('holdings', '${type}')">
                 <h2 class="mb-0 fw-bold" style="font-size: clamp(1.2rem, 5vw, 1.5rem); color: var(--dash-text);">${title}</h2><span class="nav-arrow">&rsaquo;</span>
               </div>
               
-              <div class="d-flex justify-content-between flex-wrap gap-1">
-                <div><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Networth</span><div class="value-medium">${netStr}</div></div>
-                <div class="text-end"><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Invested</span><div class="value-medium">${invStr}</div></div>
+              <div class="d-flex justify-content-between flex-nowrap gap-1">
+                <div style="min-width: 0;"><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Networth</span><div class="value-medium text-nowrap">${netStr}</div></div>
+                <div class="text-end" style="min-width: 0;"><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Invested</span><div class="value-medium text-nowrap">${invStr}</div></div>
               </div>
               
-              <div class="d-flex justify-content-between flex-wrap gap-1 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
-                <div><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Overall P&L</span><span class="${plClass} nowrap" style="font-size: clamp(0.9rem, 3.5vw, 1rem);">${plStr}</span></div>
-                <div class="text-end"><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Day's Gain</span><span class="${dailyClass} nowrap" style="font-size: clamp(0.9rem, 3.5vw, 1rem);">${dayStr} <span style="font-size:0.85em;">${dayPctStr}</span></span></div>
+              <div class="d-flex justify-content-between flex-nowrap gap-1 pt-2" style="border-top: 1px solid rgba(255,255,255,0.1);">
+                <div style="min-width: 0;"><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Overall P&L</span><span class="${plClass} d-block text-nowrap" style="font-size: clamp(0.75rem, 2.5vw, 0.95rem);">${plStr} <span style="font-size:0.85em;">${plPctStr}</span></span></div>
+                <div class="text-end" style="min-width: 0;"><span class="dash-text-small d-block mb-0" style="line-height: 1.1;">Day's Gain</span><span class="${dailyClass} d-block text-nowrap" style="font-size: clamp(0.75rem, 2.5vw, 0.95rem);">${dayStr} <span style="font-size:0.85em;">${dayPctStr}</span></span></div>
               </div>
               
               <div class="text-center d-flex flex-column align-items-center mt-2">
